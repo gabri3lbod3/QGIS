@@ -1,0 +1,275 @@
+from qgis.PyQt.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+    QLineEdit, QPushButton, QFileDialog, QTextBrowser,
+    QDateEdit, QDoubleSpinBox, QMessageBox
+)
+from qgis.PyQt.QtCore import QDate
+from qgis.utils import iface
+import os
+
+class HTMLGenerator(QDialog):
+    def generate_html(self):
+        try:
+            html_template = f"""<html>
+<head>
+<style>
+    @page {{ size: A2; margin: 10mm; }}
+    body {{ font-family: 'Arial', sans-serif; }}
+    .dados-imovel {{
+        width: 165mm;
+        height: 80mm;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin: 5mm;
+        font-size: 9pt;
+    }}
+    .cabecalho {{
+        background-color: #f0f0f0;
+        font-size: 10pt;
+        font-weight: bold;
+    }}
+    .campo {{
+        width: 25mm;
+        padding: 2mm;
+        vertical-align: top;
+    }}
+    .valor {{
+        padding: 2mm;
+        vertical-align: top;
+    }}
+</style>
+</head>
+<body>
+<table class="dados-imovel" border="1" cellspacing="0">
+    <tr>
+        <td colspan="6" class="cabecalho" style="text-align: center;">
+            DADOS DO IMÓVEL
+        </td>
+    </tr>
+    <!-- Mantenha todas as linhas da tabela com as novas classes -->
+    <tr>
+        <td class="campo">Imóvel:</td>
+        <td colspan="5" class="valor">{self.get_field_value('Imóvel')}</td>
+    </tr>
+    <tr>
+        <td class="campo">Proprietário:</td>
+        <td colspan="2" class="valor">{self.get_field_value('Proprietário')}</td>
+        <td class="campo" style="text-align: right;">CPF:</td>
+        <td colspan="2" class="valor">{self.get_field_value('CPF')}</td>
+    </tr>
+    <!-- Adicione todas as outras linhas seguindo o mesmo padrão -->
+    <!-- ... (mantenha o restante das linhas da tabela com as classes campo/valor) ... -->
+    <tr>
+        <td class="campo">Perímetro:</td>
+        <td class="valor">{self.get_field_value('Perímetro (m)')}</td>
+        <td class="campo">m</td>
+    </tr>
+</table>
+</body>
+</html>"""
+            
+            self.generated_html = html_template
+            self.preview_browser.setHtml(self.generated_html)
+            QMessageBox.information(self, "Sucesso", "HTML gerado com sucesso!")
+        
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao gerar HTML: {str(e)}")
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Gerador de Relatório de Imóvel")
+        self.setMinimumSize(800, 600)
+        self.generated_html = ""
+        self.data_fields = {}
+        self.init_ui()
+        
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # Formulário de entrada
+        form_layout = QVBoxLayout()
+        fields = [
+            ('Imóvel:', QLineEdit),
+            ('Proprietário:', QLineEdit),
+            ('CPF:', QLineEdit),
+            ('Município:', QLineEdit),
+            ('UF:', QLineEdit),
+            ('Comarca:', QLineEdit),
+            ('Cartório:', QLineEdit),
+            ('CNS:', QLineEdit),
+            ('Matrícula:', QLineEdit),
+            ('Código CCIR:', QLineEdit),
+            ('Data:', QDateEdit),
+            ('Área (ha):', QDoubleSpinBox),
+            ('Data Levantamento:', QDateEdit),
+            ('Perímetro (m):', QDoubleSpinBox)
+        ]
+        
+        for label, widget_type in fields:
+            h_layout = QHBoxLayout()
+            lbl = QLabel(label)
+            widget = widget_type()
+            
+            if widget_type == QDateEdit:
+                widget.setDate(QDate.currentDate())
+                widget.setCalendarPopup(True)
+            elif widget_type == QDoubleSpinBox:
+                widget.setMaximum(999999.99)
+                widget.setDecimals(4)
+            
+            h_layout.addWidget(lbl)
+            h_layout.addWidget(widget)
+            form_layout.addLayout(h_layout)
+            self.data_fields[label.replace(':', '').strip()] = widget
+        
+        # Botões
+        btn_layout = QHBoxLayout()
+        self.generate_btn = QPushButton("Gerar HTML")
+        self.save_btn = QPushButton("Salvar HTML")
+        self.preview_btn = QPushButton("Pré-visualizar")
+        
+        self.generate_btn.clicked.connect(self.generate_html)
+        self.save_btn.clicked.connect(self.save_html)
+        self.preview_btn.clicked.connect(self.preview_html)
+        
+        btn_layout.addWidget(self.generate_btn)
+        btn_layout.addWidget(self.preview_btn)
+        btn_layout.addWidget(self.save_btn)
+        
+        # Área de visualização
+        self.preview_browser = QTextBrowser()
+        
+        layout.addLayout(form_layout)
+        layout.addLayout(btn_layout)
+        layout.addWidget(self.preview_browser)
+        
+        self.setLayout(layout)
+    
+    def get_field_value(self, field_name):
+        widget = self.data_fields[field_name]
+        if isinstance(widget, QDateEdit):
+            return widget.date().toString("dd/MM/yyyy")
+        elif isinstance(widget, QDoubleSpinBox):
+            return f"{widget.value():,.4f}".replace('.', '#').replace(',', '.').replace('#', ',')
+        return widget.text()
+    
+    def generate_html(self):
+        try:
+            html_template = f"""<html>
+<body>
+<table cellspacing="0" border="1" style="width:100%; border-collapse: collapse; margin:20px 0;">
+    <tr>
+        <td colspan="6" style="text-align:center; padding:20px; background-color:#f0f0f0;">
+            <h1 style="margin:0;">DADOS DO IMÓVEL</h1>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>Imóvel:</strong></td>
+        <td colspan="5" style="padding:10px;">{self.get_field_value('Imóvel')}</td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>Proprietário:</strong></td>
+        <td colspan="2" style="padding:10px;">{self.get_field_value('Proprietário')}</td>
+        <td style="padding:10px; text-align:right;"><strong>CPF:</strong></td>
+        <td colspan="2" style="padding:10px;">{self.get_field_value('CPF')}</td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>Município:</strong></td>
+        <td colspan="5" style="padding:10px;">{self.get_field_value('Município')}</td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>U.F.:</strong></td>
+        <td colspan="5" style="padding:10px;">{self.get_field_value('UF')}</td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>Comarca:</strong></td>
+        <td colspan="5" style="padding:10px;">{self.get_field_value('Comarca')}</td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>Cartório:</strong></td>
+        <td colspan="5" style="padding:10px;">{self.get_field_value('Cartório')}</td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>C.N.S.:</strong></td>
+        <td colspan="5" style="padding:10px;">{self.get_field_value('CNS')}</td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>Matrícula:</strong></td>
+        <td colspan="2" style="padding:10px;">{self.get_field_value('Matrícula')}</td>
+        <td colspan="3" style="padding:10px;"></td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>Cód. CCIR:</strong></td>
+        <td colspan="2" style="padding:10px;">{self.get_field_value('Código CCIR')}</td>
+        <td colspan="3" style="padding:10px;"></td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>Data:</strong></td>
+        <td colspan="2" style="padding:10px;">{self.get_field_value('Data')}</td>
+        <td style="padding:10px;"><strong>Área (SGL):</strong></td>
+        <td style="padding:10px;">{self.get_field_value('Área (ha)')}</td>
+        <td style="padding:10px;">ha</td>
+    </tr>
+    <tr>
+        <td style="padding:10px;"><strong>Data Levantamento:</strong></td>
+        <td colspan="2" style="padding:10px;">{self.get_field_value('Data Levantamento')}</td>
+        <td style="padding:10px;"><strong>Perímetro:</strong></td>
+        <td style="padding:10px;">{self.get_field_value('Perímetro (m)')}</td>
+        <td style="padding:10px;">m</td>
+    </tr>
+</table>
+</body>
+</html>"""
+            
+            self.generated_html = html_template
+            self.preview_browser.setHtml(self.generated_html)
+            QMessageBox.information(self, "Sucesso", "HTML gerado com sucesso!")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao gerar HTML: {str(e)}")
+    
+    def save_html(self):
+        try:
+            if not self.generated_html:
+                QMessageBox.warning(self, "Aviso", "Gere o HTML primeiro antes de salvar!")
+                return
+
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Salvar HTML",
+                os.path.expanduser("~"),
+                "Arquivos HTML (*.html)"
+            )
+            
+            if path:
+                if not path.lower().endswith('.html'):
+                    path += '.html'
+                
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(self.generated_html)
+                
+                QMessageBox.information(self, "Sucesso", f"Arquivo salvo em:\n{path}")
+                iface.messageBar().pushSuccess("Sucesso", f"HTML salvo em: {path}")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao salvar arquivo: {str(e)}")
+    
+    def preview_html(self):
+        if not self.generated_html:
+            QMessageBox.warning(self, "Aviso", "Gere o HTML primeiro antes de visualizar!")
+            return
+
+        preview_dialog = QDialog()
+        preview_dialog.setWindowTitle("Pré-visualização do HTML")
+        preview_dialog.resize(800, 600)
+        
+        layout = QVBoxLayout()
+        web_view = QTextBrowser()
+        web_view.setHtml(self.generated_html)
+        
+        layout.addWidget(web_view)
+        preview_dialog.setLayout(layout)
+        preview_dialog.exec_()
+
+# Executar a aplicação
+dialog = HTMLGenerator()
+dialog.exec_()
